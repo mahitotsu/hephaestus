@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import * as bedrock from 'aws-cdk-lib/aws-bedrock';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -138,15 +139,20 @@ export class HephaestusPipelineStack extends cdk.Stack {
 
     const wave = pipeline.addWave('Hephaestus');
     wave.addPost(new pipelines.CodeBuildStep('RunClaudeCode', {
-      installCommands: [
-        'useradd -m codegen',
-        'npm install -g @anthropic-ai/claude-code',
-      ],
-      commands: [
-        'sudo -E -H -u codegen claude -p "hello world"'
-        + ' --dangerously-skip-permissions'
-        + ' --no-session-persistence',
-      ],
+      input: source,
+      partialBuildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
+        phases: {
+          install: {
+            'runtime-versions': { nodejs: '20' },
+            commands: ['bash scripts/install.sh'],
+          },
+          pre_build: {
+            commands: ['bash scripts/pre_build.sh'],
+          },
+        },
+      }),
+      commands: ['bash scripts/build.sh'],
       buildEnvironment: {
         environmentVariables: {
           CLAUDE_CODE_USE_BEDROCK: { value: '1' },
