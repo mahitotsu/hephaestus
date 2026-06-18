@@ -16,6 +16,7 @@
   "context": {
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:validationReportJson": true,
-    "@aws-cdk/customresources:installLatestAwsSdkDefault": false
+    "@aws-cdk/customresources:installLatestAwsSdkDefault": false,
+    "connectionArn": "arn:aws:codeconnections:ap-northeast-1:YOUR_AWS_ACCOUNT_ID:connection/c621477a-f8ed-42cd-a9b4-516eae4d755b"
   }
 }
