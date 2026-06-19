@@ -13,7 +13,9 @@ flowchart LR
     --> Mut["UpdatePipeline\nself-mutation"]
     --> CFn["App Stage\nCloudFormation deploy"]
     --> CB["RunClaudeCode\nClaude Code がレポートを生成"]
-    --> S3["S3 → Lambda\nブラウザで閲覧"]
+    --> S3[("S3\nレポートを保存")]
+
+    LM["Lambda Function URL\nブラウザで閲覧"] -.->|オンデマンド| S3
 ```
 
 ### Claude Code の呼び出し方
