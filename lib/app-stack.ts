@@ -22,7 +22,7 @@ export class AppStack extends cdk.Stack {
       entry: path.join(__dirname, '..', 'lambda', 'index.ts'),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_20_X,
-      description: 'Serves deployment reports from S3 as rendered HTML',
+      description: 'Serves deployment reports from S3 as rendered HTML (v2)',
       environment: {
         REPORTS_BUCKET: reportsBucket.bucketName,
       },
