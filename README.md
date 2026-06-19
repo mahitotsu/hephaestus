@@ -48,6 +48,7 @@ Claude Code はプロンプトに従って AWS API（CloudFormation, CodePipelin
 | `lambda/index.ts` | S3 のレポートを HTML にレンダリングして返す Lambda |
 | `prompts/system-prompt.txt` | Claude Code のロール定義 (システムプロンプト) |
 | `prompts/task-prompt.txt` | デプロイ後に実行するタスクのテンプレート |
+| `.mcp.json` | Claude Code に AWS MCP サーバーを登録（AWS API 呼び出しを可能にする） |
 | `scripts/install.sh` | Claude Code・uv のインストール |
 | `scripts/pre_build.sh` | Bedrock Prompt Management からプロンプトを取得 |
 | `scripts/build.sh` | `claude -p` 実行・レポートの S3 アップロード |
