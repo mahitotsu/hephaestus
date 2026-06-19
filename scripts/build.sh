@@ -17,7 +17,7 @@ p = json.load(sys.stdin)['pipeline']
 for s in p['stages']:
   for a in s['actions']:
     if a['actionTypeId']['provider'] == 'CodeStarSourceConnection':
-      print(a['configuration']['FullRepositoryName'], end='')
+      print(a['configuration']['FullRepositoryId'], end='')
       exit()
 ")"
 
