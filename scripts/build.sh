@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 mkdir -p output
+chown codegen:codegen output
 
 # Substitute CodeBuild env vars into the task prompt before passing to Claude
 TASK=$(sed \
