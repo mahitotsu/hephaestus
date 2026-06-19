@@ -24,7 +24,9 @@ Use the aws___call_aws tool to collect the following information in this exact o
    Capture: Outputs, Parameters, StackStatus, CreationTime, LastUpdatedTime, Description.
 
 4. Call cloudformation:DescribeStackEvents on "${STACK_NAME}".
-   Capture events for the most recent deployment only (from the latest UPDATE_IN_PROGRESS / CREATE_IN_PROGRESS up to the matching UPDATE_COMPLETE / CREATE_COMPLETE or ROLLBACK event).
+   From the returned events, find those with Timestamp >= "${BUILD_START_TIME}".
+   If such events exist, use them as the current deployment's timeline (from the first UPDATE_IN_PROGRESS / CREATE_IN_PROGRESS through the matching UPDATE_COMPLETE / CREATE_COMPLETE or ROLLBACK).
+   If NO events exist after "${BUILD_START_TIME}", the stack was NOT changed in this pipeline run — record ステータス as "⏭️ 変更なし" and set both duration fields to "N/A (スタック変更なし)".
 
 ### Step 3 — Resource Inventory
 5. Call cloudformation:ListStackResources on "${STACK_NAME}".
@@ -46,10 +48,10 @@ Use the exact section structure below. Technical names (AWS service names, resou
 |------|-----|
 | スタック | ${STACK_NAME} |
 | リージョン | ${AWS_REGION} |
-| ステータス | ✅ 成功 (or ❌ ロールバック) |
-| デプロイ日時 | (DescribeStackEvents の最初のイベントタイムスタンプ) |
-| スタック更新時間 | (CloudFormationイベントの最初〜最後の差分、例: 15秒) |
-| パイプライン実行時間 | (BUILD_START_TIMEからCloudFormationの最後のイベントまでの差分、例: 15分7秒) |
+| ステータス | ✅ 成功 / ❌ ロールバック / ⏭️ 変更なし |
+| デプロイ日時 | (当該デプロイの最初のCloudFormationイベントのタイムスタンプ。変更なしの場合はN/A) |
+| スタック更新時間 | (当該デプロイの最初〜最後のCloudFormationイベントの差分。変更なしの場合はN/A) |
+| パイプライン実行時間 | (BUILD_START_TIMEから当該デプロイの最後のCloudFormationイベントまでの差分。変更なしの場合はN/A) |
 | 変更サマリー | 追加 X件 / 更新 Y件 / 削除 Z件 |
 
 > **変更の要旨:** (何が変わったかを1〜2文で人間が読みやすい言葉で説明。例:「Lambda関数のランタイムをNode.js 18からNode.js 20にアップグレードし、新しい環境変数を追加しました」)
