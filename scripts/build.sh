@@ -11,6 +11,11 @@ TASK=$(sed \
   -e "s|\${STACK_NAME}|${STACK_NAME}|g" \
   -e "s|\${REPORTS_BUCKET}|${REPORTS_BUCKET}|g" \
   -e "s|\${AWS_REGION}|${AWS_REGION}|g" \
+  -e "s|\${CODEBUILD_BUILD_ID}|${CODEBUILD_BUILD_ID:-unknown}|g" \
+  -e "s|\${CODEBUILD_BUILD_NUMBER}|${CODEBUILD_BUILD_NUMBER:-unknown}|g" \
+  -e "s|\${CODEBUILD_RESOLVED_SOURCE_VERSION}|${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}|g" \
+  -e "s|\${CODEBUILD_INITIATOR}|${CODEBUILD_INITIATOR:-unknown}|g" \
+  -e "s|\${CODEBUILD_SOURCE_REPO_URL}|${CODEBUILD_SOURCE_REPO_URL:-unknown}|g" \
   /tmp/task_prompt.txt)
 
 # Lambda compute runs as non-root, so --dangerously-skip-permissions is permitted directly

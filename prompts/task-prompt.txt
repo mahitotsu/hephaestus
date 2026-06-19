@@ -1,12 +1,170 @@
 CloudFormation stack "${STACK_NAME}" was just deployed by this pipeline in region ${AWS_REGION}.
 
-Use the aws___call_aws tool to collect deployment information:
-1. cloudformation:ListChangeSets on stack "${STACK_NAME}" — identify the most recent change set
-2. cloudformation:DescribeChangeSet — get the full resource diff from that change set
-3. cloudformation:DescribeStacks on "${STACK_NAME}" — get current outputs (e.g., Function URL)
+## Build Context (pre-collected — do not fetch these via API)
+- Build ID: ${CODEBUILD_BUILD_ID}
+- Build Number: ${CODEBUILD_BUILD_NUMBER}
+- Commit SHA: ${CODEBUILD_RESOLVED_SOURCE_VERSION}
+- Triggered by: ${CODEBUILD_INITIATOR}
+- Repository: ${CODEBUILD_SOURCE_REPO_URL}
 
-Then write a concise deployment report in Japanese Markdown to output/report.md covering:
-- One-line summary of what changed
-- Resources added / modified / deleted (from the change set)
-- Stack outputs (e.g., Lambda Function URL)
-- Deployment timestamp
+## Data Collection Steps
+
+Use the aws___call_aws tool to collect the following information in this exact order:
+
+### Step 1 — Change Set Analysis
+1. Call cloudformation:ListChangeSets on stack "${STACK_NAME}".
+   Find the most recently executed change set (ExecutionStatus = "EXECUTE_COMPLETE" and most recent CreationTime).
+
+2. Call cloudformation:DescribeChangeSet with that change set name and StackName "${STACK_NAME}".
+   Capture the full Changes list including property-level Details for each resource change.
+
+### Step 2 — Stack State
+3. Call cloudformation:DescribeStacks on "${STACK_NAME}".
+   Capture: Outputs, Parameters, StackStatus, CreationTime, LastUpdatedTime, Description.
+
+4. Call cloudformation:DescribeStackEvents on "${STACK_NAME}".
+   Capture events for the most recent deployment only (from the latest UPDATE_IN_PROGRESS / CREATE_IN_PROGRESS up to the matching UPDATE_COMPLETE / CREATE_COMPLETE or ROLLBACK event).
+
+### Step 3 — Resource Inventory
+5. Call cloudformation:ListStackResources on "${STACK_NAME}".
+   Capture all current logical resources with their physical IDs and resource types.
+
+## Report Generation
+
+Write a comprehensive deployment report in **Japanese** Markdown to output/report.md.
+Use the exact section structure below. Technical names (AWS service names, resource types, property names, CLI commands) may remain in English.
+
+---
+
+```markdown
+# デプロイメントレポート
+
+## サマリー
+
+| 項目 | 値 |
+|------|-----|
+| スタック | ${STACK_NAME} |
+| リージョン | ${AWS_REGION} |
+| ステータス | ✅ 成功 (or ❌ ロールバック) |
+| デプロイ日時 | (DescribeStackEvents の最初のイベントタイムスタンプ) |
+| 所要時間 | (最初のイベント〜最後のイベントの差分、例: 2分34秒) |
+| 変更サマリー | 追加 X件 / 更新 Y件 / 削除 Z件 |
+
+> **変更の要旨:** (何が変わったかを1〜2文で人間が読みやすい言葉で説明。例:「Lambda関数のランタイムをNode.js 18からNode.js 20にアップグレードし、新しい環境変数を追加しました」)
+
+---
+
+## ビルド情報
+
+| 項目 | 値 |
+|------|-----|
+| ビルドID | ${CODEBUILD_BUILD_ID} |
+| ビルド番号 | ${CODEBUILD_BUILD_NUMBER} |
+| コミット | ${CODEBUILD_RESOLVED_SOURCE_VERSION} |
+| 実行者 | ${CODEBUILD_INITIATOR} |
+| リポジトリ | ${CODEBUILD_SOURCE_REPO_URL} |
+
+---
+
+## リソース変更詳細
+
+### 追加されたリソース（Action: Add）
+(リソースがなければ「変更なし」と記載)
+
+| 論理リソースID | リソースタイプ | 説明 |
+|---------------|--------------|------|
+| ...           | ...          | ...  |
+
+### 更新されたリソース（Action: Modify）
+(リソースがなければ「変更なし」と記載)
+
+| 論理リソースID | リソースタイプ | 変更されたプロパティ | 置換の有無 |
+|---------------|--------------|------------------|----------|
+| ...           | ...          | PropA, PropB     | なし / あり / 条件付き |
+
+### 削除されたリソース（Action: Remove）
+(リソースがなければ「変更なし」と記載)
+
+| 論理リソースID | リソースタイプ | 物理リソースID |
+|---------------|--------------|-------------|
+| ...           | ...          | ...         |
+
+---
+
+## ⚠️ セキュリティ・IAM 変更
+
+(IAMロール、IAMポリシー、セキュリティグループ、KMS キー、Secrets Manager、S3バケットポリシー、Lambda 権限など
+セキュリティに影響する変更を列挙する。何もなければ「セキュリティ関連の変更はありません」と記載。)
+
+---
+
+## スタック出力
+
+| 出力キー | 値 | 説明 |
+|---------|-----|------|
+| ...     | ... | ...  |
+
+(出力がなければ「出力なし」と記載)
+
+---
+
+## スタックパラメータ
+
+| パラメータ | 値 |
+|-----------|-----|
+| ...       | ... |
+
+(パラメータがなければ「パラメータなし」と記載)
+
+---
+
+## デプロイメントイベントタイムライン
+
+(今回のデプロイに関するCloudFormationイベントを時系列で記載)
+
+| タイムスタンプ (UTC) | 論理リソースID | ステータス | メッセージ |
+|--------------------|--------------|---------:|---------|
+| ...                | ...          | ...      | ...     |
+
+---
+
+## リソースインベントリ（デプロイ後の全リソース一覧）
+
+ListStackResources の結果をリソースタイプ別にグループ化して表示。
+
+| リソースタイプ | 件数 |
+|-------------|------|
+| ...         | ...  |
+
+**合計: N リソース**
+
+---
+
+## リスク評価
+
+**リスクレベル: 🟢 低 / 🟡 中 / 🔴 高**
+
+(以下の観点から評価する:
+- IAM ロール・ポリシーの変更 → 権限昇格リスク
+- リソース削除 → データロスリスク
+- リソース置換 (Replacement=True) → ダウンタイムリスク
+- データベース・ストレージリソースの変更 → データ影響リスク
+- ネットワーク・セキュリティグループの変更 → 疎通影響リスク
+- 変更なし / 設定のみ → 低リスク)
+
+評価根拠を2〜4文で記載。
+
+---
+
+## デプロイ後の確認事項
+
+変更内容に基づいて、担当者が確認すべき項目をチェックリストで記載する。
+一般的なもの（「動いているか確認」）は避け、この変更セットに固有の確認事項を記載する。
+
+- [ ] (確認事項1)
+- [ ] (確認事項2)
+- [ ] ...
+```
+---
+
+All values in parentheses must be filled in from the collected AWS API responses. Do not omit any section; write "該当なし" if a section has no data.

@@ -194,6 +194,7 @@ export class HephaestusPipelineStack extends cdk.Stack {
               'cloudformation:DescribeChangeSet',
               'cloudformation:DescribeStacks',
               'cloudformation:DescribeStackEvents',
+              'cloudformation:ListStackResources',
             ],
             resources: ['*'],
           }),
