@@ -225,9 +225,9 @@ aws cloudformation list-stack-resources --stack-name hephaestus-app --region ap-
 
 ## 特筆すべき挙動
 
-### 1. チェンジセット未取得への自律的対処
+### 1. チェンジセット未取得への自律的対処（※後述の検証で報告に誤りが判明）
 
-タスクプロンプトは `ListChangeSets` → `DescribeChangeSet` の順でチェンジセットから変更内容を取得する手順を指示していた。しかし実際にはチェンジセットが存在しなかったため、LLMはこれを `DescribeStackEvents` で代替し、イベント履歴（`15:59:57Z`〜`16:00:16Z`）から変更内容（`Handler886CB40B` のコード更新）を自分で読み解いた。
+タスクプロンプトは `ListChangeSets` → `DescribeChangeSet` の順でチェンジセットから変更内容を取得する手順を指示していた。LLMは「チェンジセットが存在しなかった」と報告し、`DescribeStackEvents` で代替してイベント履歴から変更内容（`Handler886CB40B` のコード更新）を読み解いた。結果として正しいレポートが生成されたが、CloudTrail との照合で「チェンジセットが存在しなかった」という報告自体が誤りだったことが後から判明している（詳細は「[監査ログによる後検証](#監査ログによる後検証)」を参照）。
 
 ### 2. MCP接続遅延の自律的リトライ
 
@@ -236,6 +236,45 @@ aws cloudformation list-stack-resources --stack-name hephaestus-app --region ap-
 ### 3. 呼び出し #1 はClaude Code SDKの内部処理
 
 最初の呼び出しはレポート生成タスクとは独立した、Claude Code SDKによるセッションタイトルの自動生成である。システムプロンプトにSDKが挿入した「3〜7語のタイトルを生成せよ」という指示に応答している。
+
+---
+
+## 監査ログによる後検証
+
+Bedrockログだけでなく、CloudTrail と CloudFormation スタックイベントを組み合わせることで、LLMの行動を独立した証拠源から事後検証できる。
+
+### チェンジセットのライフサイクル（CloudTrail より）
+
+| 時刻 (UTC) | 操作 | 対象 |
+|---|---|---|
+| 15:50:45Z | `CreateChangeSet` | `hephaestus-app / PipelineChange`（1回目） |
+| 15:58:52Z | `DeleteChangeSet` | `hephaestus-app / PipelineChange`（CodePipeline が差し替え） |
+| 15:59:24Z | `CreateChangeSet` | `hephaestus-app / PipelineChange`（2回目・最終版） |
+| 15:59:57Z | `ExecuteChangeSet` | `hephaestus-app / PipelineChange` → スタック更新開始 |
+| **16:00:16Z** | スタック更新完了 | `PipelineChange` は **EXECUTE_COMPLETE** で残存 |
+| **16:01:06Z** | LLM が `ListChangeSets` 呼び出し | ← この間に `DeleteChangeSet` は記録なし |
+
+16:00:16Z から 16:01:06Z の間に `DeleteChangeSet` は発生していない。したがって LLM が確認した時点で `PipelineChange`（EXECUTE_COMPLETE）は確実に存在していた。
+
+### LLMの報告との乖離
+
+LLMは呼び出し #5 で次のように報告している：
+
+> *"No change sets were found. Let me check the stack status and events directly."*
+
+しかし CloudTrail はチェンジセットが存在していたことを示す。`DescribeChangeSet` を呼べばチェンジセットから直接変更内容（追加・更新・削除されたリソース）を取得できたはずだが、LLM はその機会を見逃し、`DescribeStackEvents` で代替した。結果として最終レポートの内容は正確だったものの、LLMの説明（「チェンジセットが見つからなかった」）は事実と異なっていた。
+
+### このパイプラインの監査耐性
+
+上記の検証が成立する理由は、パイプラインが複数の独立した監査ログを自動的に生成しているためである。
+
+| ログ | 記録主体 | 改ざん耐性 |
+|---|---|---|
+| CloudTrail | AWS コントロールプレーン | LLM・CodeBuild からは書き込み不可 |
+| Bedrock モデル呼び出しログ | Bedrock サービス | CodeBuild ロールから書き込み不可 |
+| CloudFormation スタックイベント | CloudFormation サービス | LLM からは書き込み不可 |
+
+LLM がどれほど誤った報告をしても、CloudTrail には「何の API が・いつ・誰によって呼ばれたか」が独立して記録される。Bedrock ログには「LLM が何を受け取り・何を出力したか」が記録される。この二つを照合することで、LLM の主張と実際の動作の乖離を事後的に特定できる。
 
 ---
 
