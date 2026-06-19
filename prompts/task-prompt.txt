@@ -1,1 +1,12 @@
-Hello, World!
+CloudFormation stack "${STACK_NAME}" was just deployed by this pipeline in region ${AWS_REGION}.
+
+Use the aws___call_aws tool to collect deployment information:
+1. cloudformation:ListChangeSets on stack "${STACK_NAME}" — identify the most recent change set
+2. cloudformation:DescribeChangeSet — get the full resource diff from that change set
+3. cloudformation:DescribeStacks on "${STACK_NAME}" — get current outputs (e.g., Function URL)
+
+Then write a concise deployment report in Japanese Markdown to output/report.md covering:
+- One-line summary of what changed
+- Resources added / modified / deleted (from the change set)
+- Stack outputs (e.g., Lambda Function URL)
+- Deployment timestamp

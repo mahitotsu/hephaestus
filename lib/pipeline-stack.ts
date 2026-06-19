@@ -8,6 +8,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as pipelines from 'aws-cdk-lib/pipelines';
 import { Construct } from 'constructs';
+import { AppStage } from './app-stage';
 
 // Locked to Haiku for cost optimization — do not change without business sign-off
 const HAIKU_MODEL_ID = 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
@@ -129,7 +130,10 @@ export class HephaestusPipelineStack extends cdk.Stack {
       }),
     });
 
-    // ── Build wave ────────────────────────────────────────────────────────────
+    // ── App Stage + Claude post-step ──────────────────────────────────────────
+    const appStackName = 'hephaestus-app';
+    const reportsBucketName = `hephaestus-reports-${this.account}`;
+
     const haikuModelArn =
       `arn:aws:bedrock:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:inference-profile/${HAIKU_MODEL_ID}`;
     const haikuFoundationModelArns = [
@@ -137,47 +141,68 @@ export class HephaestusPipelineStack extends cdk.Stack {
       `arn:aws:bedrock:ap-northeast-3::foundation-model/${HAIKU_BASE_MODEL_ID}`,
     ];
 
-    const wave = pipeline.addWave('Hephaestus');
-    wave.addPost(new pipelines.CodeBuildStep('RunClaudeCode', {
-      input: source,
-      partialBuildSpec: codebuild.BuildSpec.fromObject({
-        version: '0.2',
-        phases: {
-          install: {
-            'runtime-versions': { nodejs: '20' },
-            commands: ['bash scripts/install.sh'],
+    pipeline.addStage(new AppStage(this, 'App', {
+      env: { account: this.account, region: this.region },
+    }), {
+      post: [new pipelines.CodeBuildStep('RunClaudeCode', {
+        input: source,
+        primaryOutputDirectory: 'output',
+        partialBuildSpec: codebuild.BuildSpec.fromObject({
+          version: '0.2',
+          phases: {
+            install: {
+              'runtime-versions': { nodejs: '20' },
+              commands: ['bash scripts/install.sh'],
+            },
+            pre_build: {
+              commands: ['bash scripts/pre_build.sh'],
+            },
           },
-          pre_build: {
-            commands: ['bash scripts/pre_build.sh'],
+        }),
+        commands: ['bash scripts/build.sh'],
+        buildEnvironment: {
+          environmentVariables: {
+            CLAUDE_CODE_USE_BEDROCK: { value: '1' },
+            ANTHROPIC_MODEL:         { value: HAIKU_MODEL_ID },
+            SYSTEM_PROMPT_ARN:       { value: systemPrompt.attrArn },
+            TASK_PROMPT_ARN:         { value: taskPrompt.attrArn },
+            STACK_NAME:              { value: appStackName },
+            REPORTS_BUCKET:          { value: reportsBucketName },
           },
         },
-      }),
-      commands: ['bash scripts/build.sh'],
-      buildEnvironment: {
-        environmentVariables: {
-          CLAUDE_CODE_USE_BEDROCK: { value: '1' },
-          ANTHROPIC_MODEL:         { value: HAIKU_MODEL_ID },
-          SYSTEM_PROMPT_ARN:       { value: systemPrompt.attrArn },
-          TASK_PROMPT_ARN:         { value: taskPrompt.attrArn },
-        },
-      },
-      rolePolicyStatements: [
-        new iam.PolicyStatement({
-          sid: 'BedrockInvokeHaikuOnly',
-          actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-          resources: [haikuModelArn, ...haikuFoundationModelArns],
-        }),
-        new iam.PolicyStatement({
-          sid: 'BedrockDiscoverInferenceProfiles',
-          actions: ['bedrock:ListInferenceProfiles', 'bedrock:GetInferenceProfile'],
-          resources: ['*'],
-        }),
-        new iam.PolicyStatement({
-          sid: 'BedrockGetManagedPrompts',
-          actions: ['bedrock:GetPrompt'],
-          resources: [systemPrompt.attrArn, taskPrompt.attrArn],
-        }),
-      ],
-    }));
+        rolePolicyStatements: [
+          new iam.PolicyStatement({
+            sid: 'BedrockInvokeHaikuOnly',
+            actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+            resources: [haikuModelArn, ...haikuFoundationModelArns],
+          }),
+          new iam.PolicyStatement({
+            sid: 'BedrockDiscoverInferenceProfiles',
+            actions: ['bedrock:ListInferenceProfiles', 'bedrock:GetInferenceProfile'],
+            resources: ['*'],
+          }),
+          new iam.PolicyStatement({
+            sid: 'BedrockGetManagedPrompts',
+            actions: ['bedrock:GetPrompt'],
+            resources: [systemPrompt.attrArn, taskPrompt.attrArn],
+          }),
+          new iam.PolicyStatement({
+            sid: 'CloudFormationRead',
+            actions: [
+              'cloudformation:ListChangeSets',
+              'cloudformation:DescribeChangeSet',
+              'cloudformation:DescribeStacks',
+              'cloudformation:DescribeStackEvents',
+            ],
+            resources: ['*'],
+          }),
+          new iam.PolicyStatement({
+            sid: 'S3WriteReports',
+            actions: ['s3:PutObject'],
+            resources: [`arn:aws:s3:::${reportsBucketName}/reports/*`],
+          }),
+        ],
+      })],
+    });
   }
 }
