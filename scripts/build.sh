@@ -1,7 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+
+# claude is at $HOME/.npm-global/bin, uvx (MCP proxy) at $HOME/.local/bin
+export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"
+
 mkdir -p output
-chown codegen:codegen output
 
 # Substitute CodeBuild env vars into the task prompt before passing to Claude
 TASK=$(sed \
@@ -10,10 +13,8 @@ TASK=$(sed \
   -e "s|\${AWS_REGION}|${AWS_REGION}|g" \
   /tmp/task_prompt.txt)
 
-# Run as non-root so --dangerously-skip-permissions is permitted.
-# -E preserves env vars (Bedrock credentials, ANTHROPIC_MODEL, MCP proxy, etc.)
-# -H sets HOME to /home/codegen so Claude Code config is isolated per build.
-sudo -E -H -u codegen claude -p "$TASK" \
+# Lambda compute runs as non-root, so --dangerously-skip-permissions is permitted directly
+claude -p "$TASK" \
   --model "$ANTHROPIC_MODEL" \
   --append-system-prompt-file /tmp/system_prompt.txt \
   --dangerously-skip-permissions \

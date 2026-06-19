@@ -151,7 +151,6 @@ export class HephaestusPipelineStack extends cdk.Stack {
           version: '0.2',
           phases: {
             install: {
-              'runtime-versions': { nodejs: '20' },
               commands: ['bash scripts/install.sh'],
             },
             pre_build: {
@@ -161,6 +160,8 @@ export class HephaestusPipelineStack extends cdk.Stack {
         }),
         commands: ['bash scripts/build.sh'],
         buildEnvironment: {
+          computeType: codebuild.ComputeType.LAMBDA_2GB,
+          buildImage: codebuild.LinuxLambdaBuildImage.AMAZON_LINUX_2023_NODE_20,
           environmentVariables: {
             CLAUDE_CODE_USE_BEDROCK: { value: '1' },
             ANTHROPIC_MODEL:         { value: HAIKU_MODEL_ID },
