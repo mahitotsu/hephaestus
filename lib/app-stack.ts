@@ -33,6 +33,6 @@ export class AppStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'FunctionUrl', { value: fnUrl.url });
-    new cdk.CfnOutput(this, 'ReportsBucket', { value: reportsBucket.bucketName });
+    new cdk.CfnOutput(this, 'ReportsBucketName', { value: reportsBucket.bucketName });
   }
 }
