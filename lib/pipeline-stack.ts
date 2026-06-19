@@ -108,12 +108,14 @@ export class HephaestusPipelineStack extends cdk.Stack {
     });
 
     // ── Pipeline ──────────────────────────────────────────────────────────────
-    const connectionArn = this.node.tryGetContext('connectionArn') as string | undefined;
-    if (!connectionArn) {
+    const connectionId = this.node.tryGetContext('connectionId') as string | undefined;
+    if (!connectionId) {
       throw new Error(
-        'CDK context "connectionArn" is required. Set it in cdk.json under "context".',
+        'CDK context "connectionId" is required. Set it in cdk.json under "context".',
       );
     }
+    const connectionArn =
+      `arn:aws:codeconnections:${this.region}:${this.account}:connection/${connectionId}`;
 
     const source = pipelines.CodePipelineSource.connection(
       'mahitotsu/hephaestus',

@@ -17,6 +17,6 @@
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:validationReportJson": true,
     "@aws-cdk/customresources:installLatestAwsSdkDefault": false,
-    "connectionArn": "YOUR_CODECONNECTIONS_ARN"
+    "connectionId": "dd0e0858-3474-4dfb-b2b6-a358216bb01b"
   }
 }
