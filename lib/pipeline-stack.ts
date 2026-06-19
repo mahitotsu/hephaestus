@@ -169,6 +169,7 @@ export class HephaestusPipelineStack extends cdk.Stack {
             TASK_PROMPT_ARN:         { value: taskPrompt.attrArn },
             STACK_NAME:              { value: appStackName },
             REPORTS_BUCKET:          { value: reportsBucketName },
+            GITHUB_REPO_URL:         { value: `https://github.com/${source.sourceAttribute('FullRepositoryName')}` },
           },
         },
         rolePolicyStatements: [

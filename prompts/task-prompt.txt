@@ -5,7 +5,8 @@ CloudFormation stack "${STACK_NAME}" was just deployed by this pipeline in regio
 - Build Number: ${CODEBUILD_BUILD_NUMBER}
 - Commit SHA: ${CODEBUILD_RESOLVED_SOURCE_VERSION}
 - Triggered by: ${CODEBUILD_INITIATOR}
-- Repository: ${CODEBUILD_SOURCE_REPO_URL}
+- Repository: ${GITHUB_REPO_URL}
+- Build Start Time (UTC): ${BUILD_START_TIME}
 
 ## Data Collection Steps
 
@@ -47,7 +48,8 @@ Use the exact section structure below. Technical names (AWS service names, resou
 | リージョン | ${AWS_REGION} |
 | ステータス | ✅ 成功 (or ❌ ロールバック) |
 | デプロイ日時 | (DescribeStackEvents の最初のイベントタイムスタンプ) |
-| 所要時間 | (最初のイベント〜最後のイベントの差分、例: 2分34秒) |
+| スタック更新時間 | (CloudFormationイベントの最初〜最後の差分、例: 15秒) |
+| パイプライン実行時間 | (BUILD_START_TIMEからCloudFormationの最後のイベントまでの差分、例: 15分7秒) |
 | 変更サマリー | 追加 X件 / 更新 Y件 / 削除 Z件 |
 
 > **変更の要旨:** (何が変わったかを1〜2文で人間が読みやすい言葉で説明。例:「Lambda関数のランタイムをNode.js 18からNode.js 20にアップグレードし、新しい環境変数を追加しました」)
@@ -62,7 +64,7 @@ Use the exact section structure below. Technical names (AWS service names, resou
 | ビルド番号 | ${CODEBUILD_BUILD_NUMBER} |
 | コミット | ${CODEBUILD_RESOLVED_SOURCE_VERSION} |
 | 実行者 | ${CODEBUILD_INITIATOR} |
-| リポジトリ | ${CODEBUILD_SOURCE_REPO_URL} |
+| リポジトリ | ${GITHUB_REPO_URL} |
 
 ---
 

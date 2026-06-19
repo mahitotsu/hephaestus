@@ -6,6 +6,8 @@ export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"
 
 mkdir -p output
 
+BUILD_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
 # Substitute CodeBuild env vars into the task prompt before passing to Claude
 TASK=$(sed \
   -e "s|\${STACK_NAME}|${STACK_NAME}|g" \
@@ -15,7 +17,8 @@ TASK=$(sed \
   -e "s|\${CODEBUILD_BUILD_NUMBER}|${CODEBUILD_BUILD_NUMBER:-unknown}|g" \
   -e "s|\${CODEBUILD_RESOLVED_SOURCE_VERSION}|${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}|g" \
   -e "s|\${CODEBUILD_INITIATOR}|${CODEBUILD_INITIATOR:-unknown}|g" \
-  -e "s|\${CODEBUILD_SOURCE_REPO_URL}|${CODEBUILD_SOURCE_REPO_URL:-unknown}|g" \
+  -e "s|\${GITHUB_REPO_URL}|${GITHUB_REPO_URL:-unknown}|g" \
+  -e "s|\${BUILD_START_TIME}|${BUILD_START_TIME}|g" \
   /tmp/task_prompt.txt)
 
 # Lambda compute runs as non-root, so --dangerously-skip-permissions is permitted directly
