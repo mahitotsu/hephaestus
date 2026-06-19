@@ -169,7 +169,6 @@ export class HephaestusPipelineStack extends cdk.Stack {
             TASK_PROMPT_ARN:         { value: taskPrompt.attrArn },
             STACK_NAME:              { value: appStackName },
             REPORTS_BUCKET:          { value: reportsBucketName },
-            GITHUB_REPO_URL:         { value: `https://github.com/${source.sourceAttribute('FullRepositoryName')}` },
           },
         },
         rolePolicyStatements: [
@@ -187,6 +186,11 @@ export class HephaestusPipelineStack extends cdk.Stack {
             sid: 'BedrockGetManagedPrompts',
             actions: ['bedrock:GetPrompt'],
             resources: [systemPrompt.attrArn, taskPrompt.attrArn],
+          }),
+          new iam.PolicyStatement({
+            sid: 'CodePipelineGetPipeline',
+            actions: ['codepipeline:GetPipeline'],
+            resources: [`arn:aws:codepipeline:${this.region}:${this.account}:hephaestus`],
           }),
           new iam.PolicyStatement({
             sid: 'CloudFormationRead',
