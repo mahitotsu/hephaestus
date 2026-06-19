@@ -9,11 +9,17 @@ mkdir -p output
 BUILD_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 PIPELINE_NAME="${CODEBUILD_INITIATOR#codepipeline/}"
-FULL_REPO=$(aws codepipeline get-pipeline \
-  --name "$PIPELINE_NAME" \
-  --query "pipeline.stages[].actions[] | [?actionTypeId.provider=='CodeStarSourceConnection'] | [0].configuration.FullRepositoryName" \
-  --output text)
-GITHUB_REPO_URL="https://github.com/${FULL_REPO}"
+GITHUB_REPO_URL="https://github.com/$(aws codepipeline get-pipeline \
+  --name "$PIPELINE_NAME" --output json \
+  | python3 -c "
+import sys, json
+p = json.load(sys.stdin)['pipeline']
+for s in p['stages']:
+  for a in s['actions']:
+    if a['actionTypeId']['provider'] == 'CodeStarSourceConnection':
+      print(a['configuration']['FullRepositoryName'], end='')
+      exit()
+")"
 
 # Substitute CodeBuild env vars into the task prompt before passing to Claude
 TASK=$(sed \
