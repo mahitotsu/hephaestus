@@ -268,6 +268,94 @@ Bedrock は `AWS/Bedrock` 名前空間にトークン数を CloudWatch メトリ
 
 ---
 
+## 可観測性・追跡可能性の評価
+
+### 実行系譜（Execution Lineage）
+
+GitHub プッシュから S3 レポートまで、各ステップの ID が連鎖して完全な実行系譜を形成する。
+
+```
+GitHub commit
+  │  (CodeConnections でポーリング)
+  ▼
+CodePipeline 実行 ID: 1eaaaea6-dcd0-4e1d-8088-394d7c5e0344
+  │  initiator: codepipeline/hephaestus
+  ▼
+CodeBuild ビルド #11
+  │  ID: PipelineAppRunClaudeCode07F-8nQLtl1BtRRU:a5d2b930-1f04-401c-8120-d4d23b9f3a16
+  │  開始: 16:00:30Z  終了: 16:02:08Z
+  │  (STS AssumeRole → セッション名に build ID が埋め込まれる)
+  ▼
+Bedrock 呼び出し #1〜#10（全件）
+  │  identity.arn = .../AWSCodeBuild-**a5d2b930**-1f04-401c-8120-d4d23b9f3a16
+  │           ↑ CodeBuild build ID が直接現れる
+  ▼
+S3 オブジェクト: s3://hephaestus-reports-<account-id>/reports/20260619T160206Z.md
+  │  LastModified: 2026-06-19T16:02:07Z
+  │  ETag: b629e52c58418d3d78c88d2ffc6a0136
+  └── ServerSideEncryption: AES256（保存時暗号化）
+```
+
+Bedrock ログの `identity.arn` に CodeBuild ビルド ID が含まれるため、10回のLLM呼び出しはすべてビルド単位で一意に識別・帰属できる。
+
+### IAM 最小権限の実証
+
+CodeBuild 実行ロールに付与されている権限はすべてリソースレベルで制限されており、ワイルドカード（`*`）アクションは使用していない。
+
+| 許可アクション | 対象リソース | 目的 |
+|---|---|---|
+| `bedrock:InvokeModel` | 特定モデルARN（Haiku 4.5 のみ） | LLM 呼び出し |
+| `bedrock:GetPrompt` | 2件のプロンプトARNのみ | プロンプト取得 |
+| `cloudformation:Describe*`, `List*` | `*`（読み取りのみ） | デプロイ情報収集 |
+| `s3:PutObject` | `hephaestus-reports-*/reports/*` のみ | レポート保存 |
+
+LLM はこのロールを継承して動作するため、上記以外の操作（例：他リソースの読み取り・書き込み・削除）は権限エラーで阻止される。
+
+### プロンプト取得の追跡（CloudTrail 確認済み）
+
+`pre_build.sh` が 16:00:53Z に Bedrock Prompt Management から両プロンプトを取得した事実が CloudTrail に記録されている。
+
+| 項目 | 値 |
+|---|---|
+| 呼び出し時刻 | 2026-06-19T16:00:53Z |
+| system prompt ARN | `arn:aws:bedrock:ap-northeast-1:<account-id>:prompt/FUMWOQ5VG5` |
+| task prompt ARN | `arn:aws:bedrock:ap-northeast-1:<account-id>:prompt/ZVW0TXLMWQ` |
+| バージョン指定 | **なし（DRAFT = 最新版）** ⚠️ |
+
+> **ギャップ:** バージョンを指定せず DRAFT を取得しているため、CloudTrail はフェッチの事実を記録するが、取得されたプロンプトの**内容**は記録されない。ビルド実行後にプロンプトが更新されると、どのプロンプトが実際に使われたかをログから再現できない。バージョン付きARN（例: `...prompt/ZVW0TXLMWQ:3`）を固定することで解消できる。
+
+### S3 レポートのメタデータ
+
+| 項目 | 現状 | 推奨 |
+|---|---|---|
+| オブジェクトメタデータ | **空（`{}`）** | ビルドID・モデルID・プロンプトARNを記録 |
+| バージョニング | 未確認 | 有効化推奨（上書きによる消失防止） |
+| 暗号化 | SSE-S3（AES256）✓ | 要件次第で SSE-KMS に変更 |
+
+> レポート S3 オブジェクトにビルドIDなどのメタデータを付与することで、ファイル名のタイムスタンプに依存せず実行系譜との紐付けが可能になる。`build.sh` で `aws s3 cp` に `--metadata` を追加するだけで対応できる。
+
+### ログ保持期間
+
+| ログ種別 | 現在の保持期間 | 標準的な監査要件 |
+|---|---|---|
+| Bedrock 呼び出しログ（CloudWatch） | **1ヶ月**（CDK で設定） | SOC 2 / ISO 27001: 1年以上 |
+| CloudTrail | 90日（デフォルト） | 同上 |
+| CodeBuild ログ（CloudWatch） | デフォルト（無期限） | ─ |
+
+### 現行パイプラインの観測性評価
+
+| 観点 | 状態 | 備考 |
+|---|---|---|
+| LLM 入出力の記録 | ✅ | Bedrock 呼び出しログ（ただし大出力は欠落⚠️） |
+| モデルバージョンの固定 | ✅ | 環境変数で特定モデルID を指定 |
+| 呼び出し元の帰属 | ✅ | `identity.arn` にビルドID が含まれる |
+| 独立した監査ログ | ✅ | LLM・CodeBuild から書き込み不可 |
+| プロンプトバージョンの固定 | ❌ | DRAFT を使用 → バージョン固定が必要 |
+| S3 成果物のメタデータ | ❌ | 空 → ビルドIDなどの付与が必要 |
+| ログ保持期間 | ⚠️ | 1ヶ月 → 監査要件に応じて延長が必要 |
+
+---
+
 ## 監査ログによる後検証
 
 Bedrockログだけでなく、CloudTrail と CloudFormation スタックイベントを組み合わせることで、LLMの行動を独立した証拠源から事後検証できる。
